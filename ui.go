@@ -82,7 +82,6 @@ func (data Tab) loop() {
 }
 
 func (data *Tab) redraw() {
-	termbox.Sync()
 	termbox.Clear(FgColor, BgColor)
 	defer termbox.Flush()
 	width, height := termbox.Size()
@@ -152,12 +151,12 @@ func drawString(s string, x, y int, fg, bg termbox.Attribute) {
 	}
 }
 
-func (data Tab) trimmed() bool {
+func (data *Tab) trimmed() bool {
 	w, _ := termbox.Size()
 	return data.currentX+w < data.lenSum()
 }
 
-func (data Tab) canGoDown() bool {
+func (data *Tab) canGoDown() bool {
 	_, h := termbox.Size()
 	return data.currentY+h < data.rows()
 }
