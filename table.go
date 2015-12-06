@@ -12,6 +12,9 @@ type Tab struct {
 	records  [][]string
 	maxLen   []int
 	selected int
+	currentX int // current x-axis shift
+	toSkip   int // how many cells we should skip when printing firstCol
+	firstCol int // from which column we should start printing
 }
 
 func New(records [][]string) (Tab, error) {
