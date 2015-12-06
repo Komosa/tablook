@@ -33,16 +33,7 @@ func (data Tab) Show() {
 	}
 	defer closeTermui()
 
-	width, height := termbox.Size()
-	if height < 2 {
-		return
-	}
-
-	for i := 0; i < height && i < data.rows(); i++ {
-		data.drawRow(width, i, i)
-	}
-	termbox.Flush()
-
+	data.redraw()
 	data.loop()
 }
 
@@ -50,19 +41,42 @@ func (data Tab) loop() {
 	termui.Handle("/sys/kbd/q", func(termui.Event) {
 		termui.StopLoop()
 	})
-	termui.Handle("/sys/kbd/k", func(termui.Event) {
-		if data.selected > 1 {
-			data.selected--
-			data.redrawTwoRows(data.selected)
+	chRow := func(dir int) func(termui.Event) {
+		return func(termui.Event) {
+			next := data.selected + dir
+			if next != 0 && next < data.rows() {
+				data.selected = next
+				if dir == 1 {
+					next--
+				}
+				data.redrawTwoRows(next)
+			}
 		}
-	})
-	termui.Handle("/sys/kbd/j", func(termui.Event) {
-		if data.selected+1 < data.rows() {
-			data.selected++
-			data.redrawTwoRows(data.selected - 1)
-		}
+	}
+	chUp, chDown := chRow(-1), chRow(+1)
+	termui.Handle("/sys/kbd/k", chUp)
+	termui.Handle("/sys/kbd/j", chDown)
+	termui.Handle("/sys/kbd/<down>", chDown)
+	termui.Handle("/sys/kbd/<up>", chUp)
+	termui.Handle("/sys/wnd/resize", func(termui.Event) {
+		data.redraw()
 	})
 	termui.Loop()
+}
+
+func (data Tab) redraw() {
+	termbox.Sync()
+	termbox.Clear(FgColor, BgColor)
+	width, height := termbox.Size()
+	if height < 2 {
+		drawString("wnd size too small", 0, 0, FgColor, BgColor)
+		return
+	}
+
+	for i := 0; i < height && i < data.rows(); i++ {
+		data.drawRow(width, i, i)
+	}
+	termbox.Flush()
 }
 
 func (data Tab) redrawTwoRows(firstIdx int) {
