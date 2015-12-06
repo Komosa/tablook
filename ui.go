@@ -28,14 +28,15 @@ func closeTermui() {
 	termui.Close()
 }
 
-func (data Tab) Show() {
+func (data Tab) Show() error {
 	if err := initTermui(); err != nil {
-		panic(err)
+		return err
 	}
 	defer closeTermui()
 
 	data.redraw()
 	data.loop()
+	return nil
 }
 
 func (data *Tab) loop() {
