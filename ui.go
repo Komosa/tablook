@@ -10,10 +10,11 @@ import (
 
 var ErrTermboxAlreadyInitialized = errors.New("tablook: termbox (or termui) already initialized")
 
-const (
-	FgColor  = termbox.ColorWhite
-	BgColor  = termbox.ColorBlack
-	SelColor = termbox.ColorBlue
+var (
+	FgColor        = termbox.ColorWhite
+	BgColor        = termbox.ColorBlack
+	SelColor       = termbox.ColorBlue
+	SelColumnColor = termbox.ColorGreen
 )
 
 func initTermui() error {
@@ -45,12 +46,26 @@ func (data *Tab) loop() {
 		return func(termui.Event) {
 			next := data.selected + dir
 			_, h := termbox.Size()
-			if next >= 0 && next <= h {
+			if next >= -1 && next <= h {
 				data.selected = next
 				if dir == 1 {
 					next--
+				} else if next < 1 {
+					next = 1
 				}
 				data.redrawTwoRows(next)
+			}
+		}
+	}
+	chColSel := func(dir int) func(termui.Event) {
+		return func(termui.Event) {
+			next := data.selColumn + dir
+			for next >= 0 && next < data.cols() && data.isColDel[next] {
+				next += dir
+			}
+			if next >= -1 && next <= data.cols() {
+				data.selColumn = next
+				data.redraw()
 			}
 		}
 	}
@@ -64,18 +79,31 @@ func (data *Tab) loop() {
 		}
 	}
 	chUpSel, chDownSel := chRowSel(-1), chRowSel(+1)
+	chLeftSel, chRightSel := chColSel(-1), chColSel(+1)
 	chLeft := chView(-1, &data.currentX, data.trimmed)
 	chRight := chView(+1, &data.currentX, data.trimmed)
 	chUp := chView(-1, &data.currentY, data.canGoDown)
 	chDown := chView(+1, &data.currentY, data.canGoDown)
 	termui.Handle("/sys/kbd/k", chUpSel)
 	termui.Handle("/sys/kbd/j", chDownSel)
+	termui.Handle("/sys/kbd/h", chLeftSel)
+	termui.Handle("/sys/kbd/l", chRightSel)
 	termui.Handle("/sys/kbd/<down>", chDown)
 	termui.Handle("/sys/kbd/<up>", chUp)
-	termui.Handle("/sys/kbd/h", chLeft)
-	termui.Handle("/sys/kbd/l", chRight)
 	termui.Handle("/sys/kbd/<left>", chLeft)
 	termui.Handle("/sys/kbd/<right>", chRight)
+	termui.Handle("/sys/kbd/d", func(termui.Event) {
+		if data.selColumn >= 0 && data.selColumn < data.cols() {
+			data.isColDel[data.selColumn] = true
+			if data.lenSum() == 0 {
+				// all columns removed, lets start over again
+				for i := 0; i < data.cols(); i++ {
+					data.isColDel[i] = false
+				}
+			}
+			data.redraw()
+		}
+	})
 	termui.Handle("/sys/wnd/resize", func(termui.Event) {
 		data.redraw()
 	})
@@ -94,6 +122,10 @@ func (data *Tab) redraw() {
 	data.toSkip = data.currentX
 	data.firstCol = 0
 	for data.toSkip > 0 && data.firstCol+1 != data.cols() {
+		if data.isColDel[data.firstCol] {
+			data.firstCol++
+			continue
+		}
 		if data.toSkip-data.maxLen[data.firstCol] >= 0 {
 			data.toSkip -= data.maxLen[data.firstCol]
 			data.firstCol++
@@ -109,6 +141,10 @@ func (data *Tab) redraw() {
 }
 
 func (data *Tab) redrawTwoRows(firstIdx int) {
+	if firstIdx < 2 {
+		data.redraw()
+		return
+	}
 	width, _ := termbox.Size()
 	data.drawRow(width, data.currentY+firstIdx, firstIdx)
 	data.drawRow(width, data.currentY+firstIdx+1, firstIdx+1)
@@ -120,15 +156,20 @@ func (data *Tab) drawRow(width, sourceIdx, viewIdx int) {
 	fg, bg := FgColor, BgColor
 	if data.selected == viewIdx {
 		fg = SelColor
-	} else if sourceIdx == 0 {
+	}
+	if sourceIdx == 0 {
 		fg, bg = bg, fg // header line
 	}
-	if column&1 == 1 {
+	columnIsOdd := column&1 == 1
+	if columnIsOdd {
 		fg, bg = bg, fg // odd number of coulmns skipped
 	}
 
 	negShift := -data.toSkip
-	for x < width && column < data.cols() {
+	for ; x < width && column < data.cols(); column++ {
+		if data.isColDel[column] {
+			continue
+		}
 		s := data.records[sourceIdx][column]
 		if x+data.maxLen[column] >= width {
 			// clap (maybe)
@@ -138,10 +179,19 @@ func (data *Tab) drawRow(width, sourceIdx, viewIdx int) {
 			}
 		}
 
-		drawString(s, x+negShift, viewIdx, fg, bg)
+		fgcol, bgcol := fg, bg
+		if column == data.selColumn {
+			if column&1 == 0 {
+				fgcol = SelColumnColor
+			} else {
+				bgcol = SelColumnColor
+			}
+		}
+		drawString(s, x+negShift, viewIdx, fgcol, bgcol)
+
 		fg, bg = bg, fg
 		x += data.maxLen[column]
-		column++
+		columnIsOdd = !columnIsOdd
 	}
 }
 
