@@ -12,6 +12,7 @@ type Tab struct {
 	records  [][]string
 	maxLen   []int
 	selected int
+	currentY int // current y-axis shift
 	currentX int // current x-axis shift
 	toSkip   int // how many cells we should skip when printing firstCol
 	firstCol int // from which column we should start printing

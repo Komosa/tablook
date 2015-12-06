@@ -41,7 +41,7 @@ func (data Tab) loop() {
 	termui.Handle("/sys/kbd/q", func(termui.Event) {
 		termui.StopLoop()
 	})
-	chRow := func(dir int) func(termui.Event) {
+	chRowSel := func(dir int) func(termui.Event) {
 		return func(termui.Event) {
 			next := data.selected + dir
 			if next != 0 && next < data.rows() {
@@ -53,23 +53,26 @@ func (data Tab) loop() {
 			}
 		}
 	}
-	chCol := func(dir int) func(termui.Event) {
+	chView := func(dir int, field *int, canGoFwd func() bool) func(termui.Event) {
 		return func(termui.Event) {
-			next := data.currentX + dir
-			if (dir < 0 && next >= 0) || (dir > 0 && data.trimmed()) {
-				data.currentX = next
+			next := *field + dir
+			if (dir < 0 && next >= 0) || (dir > 0 && canGoFwd()) {
+				*field = next
 				data.redraw()
 			}
 		}
 	}
-	chUp, chDown := chRow(-1), chRow(+1)
-	chLeft, chRight := chCol(-1), chCol(+1)
-	termui.Handle("/sys/kbd/k", chUp)
-	termui.Handle("/sys/kbd/j", chDown)
-	termui.Handle("/sys/kbd/h", chLeft)
-	termui.Handle("/sys/kbd/l", chRight)
+	chUpSel, chDownSel := chRowSel(-1), chRowSel(+1)
+	chLeft := chView(-1, &data.currentX, data.trimmed)
+	chRight := chView(+1, &data.currentX, data.trimmed)
+	chUp := chView(-1, &data.currentY, data.canGoDown)
+	chDown := chView(+1, &data.currentY, data.canGoDown)
+	termui.Handle("/sys/kbd/k", chUpSel)
+	termui.Handle("/sys/kbd/j", chDownSel)
 	termui.Handle("/sys/kbd/<down>", chDown)
 	termui.Handle("/sys/kbd/<up>", chUp)
+	termui.Handle("/sys/kbd/h", chLeft)
+	termui.Handle("/sys/kbd/l", chRight)
 	termui.Handle("/sys/kbd/<left>", chLeft)
 	termui.Handle("/sys/kbd/<right>", chRight)
 	termui.Handle("/sys/wnd/resize", func(termui.Event) {
@@ -98,8 +101,10 @@ func (data *Tab) redraw() {
 			break
 		}
 	}
-	for i := 0; i < height && i < data.rows(); i++ {
-		data.drawRow(width, i, i)
+
+	data.drawRow(width, 0, 0)
+	for i := 1; i < height && i+data.currentY < data.rows(); i++ {
+		data.drawRow(width, i+data.currentY, i)
 	}
 }
 
@@ -150,4 +155,9 @@ func drawString(s string, x, y int, fg, bg termbox.Attribute) {
 func (data Tab) trimmed() bool {
 	w, _ := termbox.Size()
 	return data.currentX+w < data.lenSum()
+}
+
+func (data Tab) canGoDown() bool {
+	_, h := termbox.Size()
+	return data.currentY+h < data.rows()
 }
