@@ -11,7 +11,7 @@ var ErrTooFewRecords = errors.New("tablook: at least one row must be given in ad
 type Tab struct {
 	records  [][]string
 	maxLen   []int
-	selected int
+	selected int // in view
 	currentY int // current y-axis shift
 	currentX int // current x-axis shift
 	toSkip   int // how many cells we should skip when printing firstCol

@@ -37,14 +37,15 @@ func (data Tab) Show() {
 	data.loop()
 }
 
-func (data Tab) loop() {
+func (data *Tab) loop() {
 	termui.Handle("/sys/kbd/q", func(termui.Event) {
 		termui.StopLoop()
 	})
 	chRowSel := func(dir int) func(termui.Event) {
 		return func(termui.Event) {
 			next := data.selected + dir
-			if next != 0 && next < data.rows() {
+			_, h := termbox.Size()
+			if next >= 0 && next <= h {
 				data.selected = next
 				if dir == 1 {
 					next--
@@ -107,17 +108,17 @@ func (data *Tab) redraw() {
 	}
 }
 
-func (data Tab) redrawTwoRows(firstIdx int) {
+func (data *Tab) redrawTwoRows(firstIdx int) {
 	width, _ := termbox.Size()
-	data.drawRow(width, firstIdx, firstIdx)
-	data.drawRow(width, firstIdx+1, firstIdx+1)
+	data.drawRow(width, data.currentY+firstIdx, firstIdx)
+	data.drawRow(width, data.currentY+firstIdx+1, firstIdx+1)
 	termbox.Flush()
 }
 
-func (data Tab) drawRow(width, sourceIdx, viewIdx int) {
+func (data *Tab) drawRow(width, sourceIdx, viewIdx int) {
 	column, x := data.firstCol, 0
 	fg, bg := FgColor, BgColor
-	if data.selected == sourceIdx {
+	if data.selected == viewIdx {
 		fg = SelColor
 	} else if sourceIdx == 0 {
 		fg, bg = bg, fg // header line
