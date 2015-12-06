@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"strings"
-	"tablook"
+
+	"github.com/komosa/tablook"
 )
 
 func main() {

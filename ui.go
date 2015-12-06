@@ -153,6 +153,9 @@ func (data *Tab) redrawTwoRows(firstIdx int) {
 }
 
 func (data *Tab) drawRow(width, sourceIdx, viewIdx int) {
+	if sourceIdx >= data.rows() {
+		return
+	}
 	column, x := data.firstCol, 0
 	fg, bg := FgColor, BgColor
 	if data.selected == viewIdx {
